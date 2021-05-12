@@ -52,6 +52,10 @@ typedef struct {
     #define NUM_TIMERS_PER_PIN 2
     #define NUM_ADC_PER_PIN 1
 #endif
+#ifdef SAML21
+    #define NUM_TIMERS_PER_PIN 2
+    #define NUM_ADC_PER_PIN 1
+#endif
 #ifdef SAM_D5X_E5X
     #define NUM_TIMERS_PER_PIN 3
     #define NUM_ADC_PER_PIN 2
@@ -72,6 +76,9 @@ typedef struct {
 
 #ifdef SAMD21
 #include "samd/samd21/pins.h"
+#endif
+#ifdef SAML21
+#include "samd/saml21/pins.h"
 #endif
 #ifdef SAM_D5X_E5X
 #include "samd/sam_d5x_e5x/pins.h"
