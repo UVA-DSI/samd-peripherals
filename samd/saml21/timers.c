@@ -31,94 +31,41 @@
 
 #include "timer_handler.h"
 
-#include "hri_gclk.h"
+#include "hpl/gclk/hpl_gclk_base.h"
 
-const uint8_t tcc_cc_num[5] = {6, 4, 3, 2, 2};
+const uint8_t tcc_cc_num[3] = {4, 2, 2};
 const uint8_t tc_gclk_ids[TC_INST_NUM] = {TC0_GCLK_ID,
                                           TC1_GCLK_ID,
-                                          TC2_GCLK_ID,
-                                          TC3_GCLK_ID,
-#ifdef TC4_GCLK_ID
                                           TC4_GCLK_ID,
-#endif
-#ifdef TC5_GCLK_ID
-                                          TC5_GCLK_ID,
-#endif
-#ifdef TC6_GCLK_ID
-                                          TC6_GCLK_ID,
-#endif
-#ifdef TC7_GCLK_ID
-                                          TC7_GCLK_ID,
-#endif
                                       };
-const uint8_t tcc_gclk_ids[TCC_INST_NUM] = {TCC0_GCLK_ID,
-                                            TCC1_GCLK_ID,
-                                            TCC2_GCLK_ID,
-#ifdef TCC3_GCLK_ID
-                                            TCC3_GCLK_ID,
-#endif
-#ifdef TCC4_GCLK_ID
-                                            TCC4_GCLK_ID
-#endif
-                                    };
 
 void turn_on_clocks(bool is_tc, uint8_t index, uint32_t gclk_index) {
     uint8_t gclk_id;
     if (is_tc) {
         gclk_id = tc_gclk_ids[index];
     } else {
-        gclk_id = tcc_gclk_ids[index];
+        gclk_id = TCC0_GCLK_ID;
     }
     // Turn on the clocks for the peripherals.
     if (is_tc) {
         switch (index) {
             case 0:
-                MCLK->APBAMASK.reg |= MCLK_APBAMASK_TC0;
+                MCLK->APBCMASK.reg |= MCLK_APBCMASK_TC0;
                 break;
             case 1:
-                MCLK->APBAMASK.reg |= MCLK_APBAMASK_TC1;
+                MCLK->APBCMASK.reg |= MCLK_APBCMASK_TC1;
                 break;
             case 2:
-                MCLK->APBBMASK.reg |= MCLK_APBBMASK_TC2;
+                MCLK->APBCMASK.reg |= MCLK_APBCMASK_TC2;
                 break;
             case 3:
-                MCLK->APBBMASK.reg |= MCLK_APBBMASK_TC3;
-                break;
-            case 4:
-                MCLK->APBCMASK.reg |= MCLK_APBCMASK_TC4;
-                break;
-            case 5:
-                MCLK->APBCMASK.reg |= MCLK_APBCMASK_TC5;
-                break;
-            case 6:
-                MCLK->APBDMASK.reg |= MCLK_APBDMASK_TC6;
-                break;
-            case 7:
-                MCLK->APBDMASK.reg |= MCLK_APBDMASK_TC7;
+                MCLK->APBCMASK.reg |= MCLK_APBCMASK_TC3;
                 break;
             default:
                 break;
         }
     } else {
-        switch (index) {
-            case 0:
-                MCLK->APBBMASK.reg |= MCLK_APBBMASK_TCC0;
-                break;
-            case 1:
-                MCLK->APBBMASK.reg |= MCLK_APBBMASK_TCC1;
-                break;
-            case 2:
-                MCLK->APBCMASK.reg |= MCLK_APBCMASK_TCC2;
-                break;
-            case 3:
-                MCLK->APBCMASK.reg |= MCLK_APBCMASK_TCC3;
-                break;
-            case 4:
-                MCLK->APBDMASK.reg |= MCLK_APBDMASK_TCC4;
-                break;
-            default:
-                break;
-        }
+        MCLK->APBCMASK.reg |= MCLK_APBCMASK_TCC0;
     }
 
     // FIXME(tannewt): TC4-TC7 can only have 100mhz inputs.

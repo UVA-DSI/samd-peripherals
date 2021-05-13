@@ -24,12 +24,9 @@
  * THE SOFTWARE.
  */
 
-#include "sam.h"
-
-// The SAML21 doesn't have a cache so we have nothing to do.
+// The SAML22 doesn't have a cache so we have nothing to do.
 void samd_peripherals_disable_and_clear_cache(void) {
 }
 
-// Enable cache
 void samd_peripherals_enable_cache(void) {
 }

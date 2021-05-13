@@ -24,9 +24,8 @@
  * THE SOFTWARE.
  */
 
+#include "hal_atomic.h"
 #include "samd/clocks.h"
-
-#include "hpl_gclk_config.h"
 
 bool gclk_enabled(uint8_t gclk) {
     return GCLK->GENCTRL[gclk].bit.GENEN;
@@ -75,17 +74,17 @@ void disable_clock_generator(uint8_t gclk) {
 }
 
 static void init_clock_source_osculp32k(void) {
+    //for SAML21???
     // Calibration value is loaded at startup
-    OSC32KCTRL->OSCULP32K.bit.EN1K = 0;
-    OSC32KCTRL->OSCULP32K.bit.EN32K = 1;
+    //OSC32KCTRL->OSCULP32K.bit.EN1K = 0;
+    //OSC32KCTRL->OSCULP32K.bit.EN32K = 1;
 }
 
 static void init_clock_source_xosc32k(void) {
     OSC32KCTRL->XOSC32K.reg = OSC32KCTRL_XOSC32K_ONDEMAND |
                               OSC32KCTRL_XOSC32K_EN32K |
                               OSC32KCTRL_XOSC32K_XTALEN |
-                              OSC32KCTRL_XOSC32K_ENABLE |
-                              OSC32KCTRL_XOSC32K_EN1K;
+                              OSC32KCTRL_XOSC32K_ENABLE;
 }
 
 static void init_clock_source_dpll0(void)
@@ -111,13 +110,13 @@ void clock_init(bool has_crystal, uint32_t dfll48m_fine_calibration) {
         OSC32KCTRL->RTCCTRL.bit.RTCSEL = OSC32KCTRL_RTCCTRL_RTCSEL_ULP32K_Val;
     }
 
-    MCLK->CPUDIV.reg = MCLK_CPUDIV_CPUDIV_DIV1;
+    MCLK->CPUDIV.reg = MCLK_CPUDIV_CPUDIV(1);
 
-    enable_clock_generator_sync(0, GCLK_GENCTRL_SRC_DPLL0_Val, 1, false);
-    enable_clock_generator_sync(1, GCLK_GENCTRL_SRC_DFLL_Val, 1, false);
-    enable_clock_generator_sync(4, GCLK_GENCTRL_SRC_DPLL0_Val, 1, false);
-    enable_clock_generator_sync(5, GCLK_GENCTRL_SRC_DFLL_Val, 24, false);
-    enable_clock_generator_sync(6, GCLK_GENCTRL_SRC_DFLL_Val, 4, false);
+    enable_clock_generator_sync(0, GCLK_GENCTRL_SRC_DPLL96M_Val, 1, false);
+    enable_clock_generator_sync(1, GCLK_GENCTRL_SRC_DFLL48M_Val, 1, false);
+    enable_clock_generator_sync(4, GCLK_GENCTRL_SRC_DPLL96M_Val, 1, false);
+    enable_clock_generator_sync(5, GCLK_GENCTRL_SRC_DFLL48M_Val, 24, false);
+    enable_clock_generator_sync(6, GCLK_GENCTRL_SRC_DFLL48M_Val, 4, false);
 
     init_clock_source_dpll0();
 
@@ -139,36 +138,30 @@ static uint8_t generator_get_source(uint8_t gen) {
 
 static bool osc_enabled(uint8_t index) {
     switch (index) {
-        case GCLK_SOURCE_XOSC0:
-            return OSCCTRL->XOSCCTRL[0].bit.ENABLE;
-        case GCLK_SOURCE_XOSC1:
-            return OSCCTRL->XOSCCTRL[1].bit.ENABLE;
+        case GCLK_SOURCE_XOSC:
+            return OSCCTRL->XOSCCTRL.bit.ENABLE;
         case GCLK_SOURCE_OSCULP32K:
             return true;
         case GCLK_SOURCE_XOSC32K:
             return OSC32KCTRL->XOSC32K.bit.ENABLE;
-        case GCLK_SOURCE_DFLL:
-            return OSCCTRL->DFLLCTRLA.bit.ENABLE;
-        case GCLK_SOURCE_DPLL0:
-            return OSCCTRL->Dpll[0].DPLLCTRLA.bit.ENABLE;
-        case GCLK_SOURCE_DPLL1:
-            return OSCCTRL->Dpll[1].DPLLCTRLA.bit.ENABLE;
+        case GCLK_SOURCE_DFLL48M:
+            return OSCCTRL->DFLLCTRL.bit.ENABLE;
+        case GCLK_SOURCE_DPLL96M:
+            return OSCCTRL->DPLLCTRLA.bit.ENABLE;
     };
     return false;
 }
 
 static uint32_t osc_get_source(uint8_t index) {
-    uint8_t dpll_index = index - GCLK_SOURCE_DPLL0;
-    uint32_t refclk = OSCCTRL->Dpll[dpll_index].DPLLCTRLB.bit.REFCLK;
+    uint8_t dpll_index = index - GCLK_SOURCE_DPLL96M;
+    uint32_t refclk = OSCCTRL->DPLLCTRLB.bit.REFCLK;
     switch (refclk) {
         case 0x0:
-            return generator_get_source(GCLK->PCHCTRL[OSCCTRL_GCLK_ID_FDPLL0 + dpll_index].bit.GEN);
-        case 0x1:
             return GCLK_SOURCE_XOSC32K;
+        case 0x1:
+            return GCLK_SOURCE_XOSC;
         case 0x2:
-            return GCLK_SOURCE_XOSC0;
-        case 0x3:
-            return GCLK_SOURCE_XOSC1;
+            return generator_get_source(GCLK->PCHCTRL[OSCCTRL_GCLK_ID_FDPLL + dpll_index].bit.GEN);
     }
     return 0;
 }
@@ -190,13 +183,13 @@ static uint32_t generator_get_frequency(uint8_t gen) {
 }
 
 static uint32_t dpll_get_frequency(uint8_t index) {
-    uint8_t dpll_index = index - GCLK_SOURCE_DPLL0;
-    uint32_t refclk = OSCCTRL->Dpll[dpll_index].DPLLCTRLB.bit.REFCLK;
+    uint8_t dpll_index = index - GCLK_SOURCE_DPLL96M;
+    uint32_t refclk = OSCCTRL->DPLLCTRLB.bit.REFCLK;
     uint32_t freq;
 
     switch (refclk) {
         case 0x0: // GCLK
-            freq = generator_get_frequency(GCLK->PCHCTRL[OSCCTRL_GCLK_ID_FDPLL0 + dpll_index].bit.GEN);
+            freq = generator_get_frequency(GCLK->PCHCTRL[OSCCTRL_GCLK_ID_FDPLL + dpll_index].bit.GEN);
             break;
         case 0x1: // XOSC32
             freq = 32768;
@@ -207,22 +200,20 @@ static uint32_t dpll_get_frequency(uint8_t index) {
             return 0; // unknown
     }
 
-    return (freq * (OSCCTRL->Dpll[dpll_index].DPLLRATIO.bit.LDR + 1)) +
-           (freq * OSCCTRL->Dpll[dpll_index].DPLLRATIO.bit.LDRFRAC / 32);
+    return (freq * (OSCCTRL->DPLLRATIO.bit.LDR + 1)) +
+           (freq * OSCCTRL->DPLLRATIO.bit.LDRFRAC / 32);
 }
 
 static uint32_t osc_get_frequency(uint8_t index) {
     switch (index) {
-        case GCLK_SOURCE_XOSC0:
-        case GCLK_SOURCE_XOSC1:
+        case GCLK_SOURCE_XOSC:
             return 0; // unknown
         case GCLK_SOURCE_OSCULP32K:
         case GCLK_SOURCE_XOSC32K:
             return 32768;
-        case GCLK_SOURCE_DFLL:
+        case GCLK_SOURCE_DFLL48M:
             return 48000000;
-        case GCLK_SOURCE_DPLL0:
-        case GCLK_SOURCE_DPLL1:
+        case GCLK_SOURCE_DPLL96M:
             return dpll_get_frequency(index);
     }
     return 0;
@@ -240,7 +231,7 @@ bool clock_get_enabled(uint8_t type, uint8_t index) {
 
 bool clock_get_parent(uint8_t type, uint8_t index, uint8_t *p_type, uint8_t *p_index) {
     if (type == 0 && osc_enabled(index)) {
-         if (index == GCLK_SOURCE_DPLL0 || index == GCLK_SOURCE_DPLL1) {
+         if (index == GCLK_SOURCE_DPLL96M) {
             *p_type = 0;
             *p_index = osc_get_source(index);
             return true;
@@ -289,7 +280,7 @@ uint32_t clock_get_frequency(uint8_t type, uint8_t index) {
             case 0:
                 return clock_get_frequency(0, generator_get_source(0)) / SysTick->LOAD;
             case 1:
-                return clock_get_frequency(0, generator_get_source(0)) / MCLK->CPUDIV.bit.DIV;
+                return clock_get_frequency(0, generator_get_source(0)) / MCLK->CPUDIV.bit.CPUDIV;
             case 2:
                 switch (OSC32KCTRL->RTCCTRL.bit.RTCSEL) {
                     case 0:

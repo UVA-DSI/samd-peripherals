@@ -24,12 +24,8 @@
  * THE SOFTWARE.
  */
 
-#include "hal/include/hal_adc_sync.h"
 #include "hpl/gclk/hpl_gclk_base.h"
-#include "hri_mclk.h"
 
-// The clock initializer values are rather random, so we need to put them in
-// tables for lookup. We can't compute them.
 
 static const uint8_t SERCOMx_GCLK_ID_CORE[] = {
     SERCOM0_GCLK_ID_CORE,
@@ -68,23 +64,23 @@ void samd_peripherals_sercom_clock_init(Sercom* sercom, uint8_t sercom_index) {
                                    SERCOMx_GCLK_ID_SLOW[sercom_index],
                                    GCLK_PCHCTRL_GEN_GCLK3_Val | (1 << GCLK_PCHCTRL_CHEN_Pos));
 
-        // hri_mclk_set_APBAMASK_SERCOMx_bit is an inline, so let's use a switch, not a table.
+        // hri_mclk_set_APBCMASK_SERCOMx_bit is an inline, so let's use a switch, not a table.
         switch (sercom_index) {
         case 0:
-            hri_mclk_set_APBAMASK_SERCOM0_bit(MCLK);
+            hri_mclk_set_APBCMASK_SERCOM0_bit(MCLK);
             break;
         case 1:
-            hri_mclk_set_APBAMASK_SERCOM1_bit(MCLK);
+            hri_mclk_set_APBCMASK_SERCOM1_bit(MCLK);
             break;
         case 2:
-            hri_mclk_set_APBBMASK_SERCOM2_bit(MCLK);
+            hri_mclk_set_APBCMASK_SERCOM2_bit(MCLK);
             break;
         case 3:
-            hri_mclk_set_APBBMASK_SERCOM3_bit(MCLK);
+            hri_mclk_set_APBCMASK_SERCOM3_bit(MCLK);
             break;
 #ifdef SERCOM4
         case 4:
-            hri_mclk_set_APBDMASK_SERCOM4_bit(MCLK);
+            hri_mclk_set_APBCMASK_SERCOM4_bit(MCLK);
             break;
 #endif
 #ifdef SERCOM5

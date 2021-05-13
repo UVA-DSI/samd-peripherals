@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2017 Scott Shawcroft for Adafruit Industries
+ * Copyright (c) 2017-2018 Scott Shawcroft for Adafruit Industries
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -35,61 +35,84 @@
 #include "shared-bindings/microcontroller/__init__.h"
 
 uint8_t sercom_index(Sercom* sercom) {
-    const Sercom* sercoms[SERCOM_INST_NUM] = SERCOM_INSTS;
-    for (uint8_t i = 0; i < SERCOM_INST_NUM; i++) {
-        if (sercoms[i] == sercom) {
-            return i;
-        }
-    }
-    return 0;
+    return ((uint32_t) sercom - (uint32_t) SERCOM0) / 0x400;
 }
 
 void dma_configure(uint8_t channel_number, uint8_t trigsrc, bool output_event) {
-    DmacChannel* channel = &DMAC->Channel[channel_number];
-    channel->CHCTRLA.reg &= ~DMAC_CHCTRLA_ENABLE;
-    channel->CHCTRLA.reg = DMAC_CHCTRLA_SWRST;
+    common_hal_mcu_disable_interrupts();
+    /** Select the DMA channel and clear software trigger */
+    DMAC->CHID.reg = DMAC_CHID_ID(channel_number);
+    DMAC->CHCTRLA.reg &= ~DMAC_CHCTRLA_ENABLE;
+    DMAC->CHCTRLA.reg = DMAC_CHCTRLA_SWRST;
+    DMAC->SWTRIGCTRL.reg &= (uint32_t)(~(1 << channel_number));
+    uint32_t event_output_enable = 0;
     if (output_event) {
-        channel->CHEVCTRL.reg = DMAC_CHEVCTRL_EVOE;
+        event_output_enable = DMAC_CHCTRLB_EVOE;
     }
-    channel->CHCTRLA.reg = DMAC_CHCTRLA_TRIGSRC(trigsrc) |
-                           DMAC_CHCTRLA_TRIGACT_BURST |
-                           DMAC_CHCTRLA_BURSTLEN_SINGLE;
+    DMAC->CHCTRLB.reg = DMAC_CHCTRLB_LVL(0) |
+            DMAC_CHCTRLB_TRIGSRC(trigsrc) |
+            DMAC_CHCTRLB_TRIGACT_BEAT |
+            event_output_enable;
+    common_hal_mcu_enable_interrupts();
 }
 
 void dma_enable_channel(uint8_t channel_number) {
-    DmacChannel* channel = &DMAC->Channel[channel_number];
-    channel->CHCTRLA.bit.ENABLE = true;
+    common_hal_mcu_disable_interrupts();
+    /** Select the DMA channel and clear software trigger */
+    DMAC->CHID.reg = DMAC_CHID_ID(channel_number);
     // Clear any previous interrupts.
-    channel->CHINTFLAG.reg = DMAC_CHINTFLAG_MASK;
+    DMAC->CHINTFLAG.reg = DMAC_CHINTFLAG_MASK;
+    DMAC->CHCTRLA.bit.ENABLE = true;
+    common_hal_mcu_enable_interrupts();
 }
 
 void dma_disable_channel(uint8_t channel_number) {
-    DmacChannel* channel = &DMAC->Channel[channel_number];
-    channel->CHCTRLA.bit.ENABLE = false;
+    common_hal_mcu_disable_interrupts();
+    /** Select the DMA channel and clear software trigger */
+    DMAC->CHID.reg = DMAC_CHID_ID(channel_number);
+    DMAC->CHCTRLA.bit.ENABLE = false;
+    common_hal_mcu_enable_interrupts();
 }
 
 void dma_suspend_channel(uint8_t channel_number) {
-    DmacChannel* channel = &DMAC->Channel[channel_number];
-    channel->CHCTRLB.reg = DMAC_CHCTRLB_CMD_SUSPEND;
+    common_hal_mcu_disable_interrupts();
+    /** Select the DMA channel and clear software trigger */
+    DMAC->CHID.reg = DMAC_CHID_ID(channel_number);
+    DMAC->CHCTRLB.bit.CMD = DMAC_CHCTRLB_CMD_SUSPEND_Val;
+    common_hal_mcu_enable_interrupts();
 }
 
 void dma_resume_channel(uint8_t channel_number) {
-    DmacChannel* channel = &DMAC->Channel[channel_number];
-    channel->CHCTRLB.reg = DMAC_CHCTRLB_CMD_RESUME;
-    channel->CHINTFLAG.reg = DMAC_CHINTFLAG_SUSP;
+    common_hal_mcu_disable_interrupts();
+    /** Select the DMA channel and clear software trigger */
+    DMAC->CHID.reg = DMAC_CHID_ID(channel_number);
+    DMAC->CHCTRLB.bit.CMD = DMAC_CHCTRLB_CMD_RESUME_Val;
+    DMAC->CHINTFLAG.reg = DMAC_CHINTFLAG_SUSP;
+    common_hal_mcu_enable_interrupts();
 }
 
 bool dma_channel_enabled(uint8_t channel_number) {
-    DmacChannel* channel = &DMAC->Channel[channel_number];
-    return channel->CHCTRLA.bit.ENABLE;
+    common_hal_mcu_disable_interrupts();
+    /** Select the DMA channel and clear software trigger */
+    DMAC->CHID.reg = DMAC_CHID_ID(channel_number);
+    bool enabled = DMAC->CHCTRLA.bit.ENABLE;
+    common_hal_mcu_enable_interrupts();
+    return enabled;
 }
 
 uint8_t dma_transfer_status(uint8_t channel_number) {
-    DmacChannel* channel = &DMAC->Channel[channel_number];
-    return channel->CHINTFLAG.reg;
+    common_hal_mcu_disable_interrupts();
+    /** Select the DMA channel and clear software trigger */
+    DMAC->CHID.reg = DMAC_CHID_ID(channel_number);
+    uint8_t status = DMAC->CHINTFLAG.reg;
+    common_hal_mcu_enable_interrupts();
+    return status;
 }
 
 bool dma_channel_free(uint8_t channel_number) {
-    DmacChannel* channel = &DMAC->Channel[channel_number];
-    return channel->CHSTATUS.reg == 0;
+    common_hal_mcu_disable_interrupts();
+    DMAC->CHID.reg = DMAC_CHID_ID(channel_number);
+    bool channel_free = DMAC->CHSTATUS.reg == 0;
+    common_hal_mcu_enable_interrupts();
+    return channel_free;
 }

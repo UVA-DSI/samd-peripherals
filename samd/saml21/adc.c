@@ -33,15 +33,13 @@
 void samd_peripherals_adc_setup(struct adc_sync_descriptor *adc, Adc *instance) {
     // Turn the clocks on.
     hri_mclk_set_APBDMASK_ADC_bit(MCLK);
-    hri_gclk_write_PCHCTRL_reg(GCLK, ADC_GCLK_ID, GCLK_PCHCTRL_GEN_GCLK1_Val | (1 << GCLK_PCHCTRL_CHEN_Pos));
+    hri_gclk_write_PCHCTRL_reg(GCLK, ADC_GCLK_ID, GCLK_PCHCTRL_GEN_GCLK0_Val | (1 << GCLK_PCHCTRL_CHEN_Pos));
 
     adc_sync_init(adc, instance, (void *)NULL);
 
-    // SAML21 has a CALIB register but doesn't have documented fuses for them.
-    uint8_t biasrefbuf;
-    uint8_t biascomp;
-        biasrefbuf = ((*(uint32_t*) ADC_FUSES_BIASREFBUF_ADDR) & ADC_FUSES_BIASREFBUF_Msk) >> ADC_FUSES_BIASREFBUF_Pos;
-        biascomp = ((*(uint32_t*) ADC_FUSES_BIASCOMP_ADDR) & ADC_FUSES_BIASCOMP_Msk) >> ADC_FUSES_BIASCOMP_Pos;
+    // Load the factory calibration
+    uint8_t biasrefbuf = ((*(uint32_t*) ADC_FUSES_BIASREFBUF_ADDR) & ADC_FUSES_BIASREFBUF_Msk) >> ADC_FUSES_BIASREFBUF_Pos;
+    uint8_t biascomp = ((*(uint32_t*) ADC_FUSES_BIASCOMP_ADDR) & ADC_FUSES_BIASCOMP_Msk) >> ADC_FUSES_BIASCOMP_Pos;
     hri_adc_write_CALIB_BIASREFBUF_bf(instance, biasrefbuf);
     hri_adc_write_CALIB_BIASCOMP_bf(instance, biascomp);
 }
