@@ -26,6 +26,7 @@
 
 #include "hal_atomic.h"
 #include "samd/clocks.h"
+#include "hpl_gclk_config.h"
 
 bool gclk_enabled(uint8_t gclk) {
     return GCLK->GENCTRL[gclk].bit.GENEN;
@@ -74,7 +75,7 @@ void disable_clock_generator(uint8_t gclk) {
 }
 
 static void init_clock_source_osculp32k(void) {
-    //for SAML21???
+    // unavailable 32kHz Ultra Low Power Internal Oscillator for SAML21
     // Calibration value is loaded at startup
     //OSC32KCTRL->OSCULP32K.bit.EN1K = 0;
     //OSC32KCTRL->OSCULP32K.bit.EN32K = 1;
@@ -87,9 +88,9 @@ static void init_clock_source_xosc32k(void) {
                               OSC32KCTRL_XOSC32K_ENABLE;
 }
 
-static void init_clock_source_dpll0(void)
+static void init_clock_source_dpll48(void)
 {
-    GCLK->PCHCTRL[OSCCTRL_GCLK_ID_FDPLL].reg = GCLK_PCHCTRL_CHEN | GCLK_PCHCTRL_GEN(5);
+    GCLK->PCHCTRL[OSCCTRL_GCLK_ID_DFLL48].reg = GCLK_PCHCTRL_CHEN | GCLK_PCHCTRL_GEN(5);
     OSCCTRL->DPLLRATIO.reg = OSCCTRL_DPLLRATIO_LDRFRAC(0) | OSCCTRL_DPLLRATIO_LDR(59);
     OSCCTRL->DPLLCTRLB.reg = OSCCTRL_DPLLCTRLB_REFCLK(0);
     OSCCTRL->DPLLCTRLA.reg = OSCCTRL_DPLLCTRLA_ENABLE;
@@ -112,13 +113,11 @@ void clock_init(bool has_crystal, uint32_t dfll48m_fine_calibration) {
 
     MCLK->CPUDIV.reg = MCLK_CPUDIV_CPUDIV(1);
 
-    enable_clock_generator_sync(0, GCLK_GENCTRL_SRC_DPLL96M_Val, 1, false);
+    enable_clock_generator_sync(0, GCLK_GENCTRL_SRC_DFLL48M_Val, 1, false);
     enable_clock_generator_sync(1, GCLK_GENCTRL_SRC_DFLL48M_Val, 1, false);
-    enable_clock_generator_sync(4, GCLK_GENCTRL_SRC_DPLL96M_Val, 1, false);
-    enable_clock_generator_sync(5, GCLK_GENCTRL_SRC_DFLL48M_Val, 24, false);
-    enable_clock_generator_sync(6, GCLK_GENCTRL_SRC_DFLL48M_Val, 4, false);
+    enable_clock_generator_sync(3, GCLK_GENCTRL_SRC_OSC32K_Val, 1, false);
 
-    init_clock_source_dpll0();
+    init_clock_source_dpll48();
 
     // Do this after all static clock init so that they aren't used dynamically.
     init_dynamic_clocks();
@@ -147,7 +146,7 @@ static bool osc_enabled(uint8_t index) {
         case GCLK_SOURCE_DFLL48M:
             return OSCCTRL->DFLLCTRL.bit.ENABLE;
         case GCLK_SOURCE_DPLL96M:
-            return OSCCTRL->DPLLCTRLA.bit.ENABLE;
+            return OSCCTRL->DPLLCTRLA.bit.ENABLE; //Correct?? SAML21
     };
     return false;
 }
