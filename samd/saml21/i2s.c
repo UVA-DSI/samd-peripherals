@@ -29,11 +29,24 @@
 #include "samd/clocks.h"
 
 #include "hpl/gclk/hpl_gclk_base.h"
-#include "hpl/pm/hpl_pm_base.h"
 
-// The SAML22 doesn't have an I2S peripheral; nothing to do here!
 void turn_on_i2s(void) {
+    // Make sure the I2S peripheral is running so we can see if the resources we need are free.
+    hri_mclk_set_APBDMASK_I2S_bit(MCLK);
+
+    // Connect the clock units to the 2mhz clock by default. They can't reset without it.
+    connect_gclk_to_peripheral(5, I2S_GCLK_ID_0);
+    connect_gclk_to_peripheral(5, I2S_GCLK_ID_1);
 }
 
 void i2s_set_serializer_enable(uint8_t serializer, bool enable) {
+    if (serializer == 0) {
+        while (I2S->SYNCBUSY.bit.TXEN == 1) {}
+        I2S->CTRLA.bit.TXEN = enable;
+        while (I2S->SYNCBUSY.bit.TXEN == 1) {}
+    } else {
+        while (I2S->SYNCBUSY.bit.RXEN == 1) {}
+        I2S->CTRLA.bit.RXEN = enable;
+        while (I2S->SYNCBUSY.bit.RXEN == 1) {}
+    }
 }
