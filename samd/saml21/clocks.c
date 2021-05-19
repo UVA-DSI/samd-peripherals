@@ -28,6 +28,17 @@
 #include "samd/clocks.h"
 #include "hpl_gclk_config.h"
 
+/* Defines missing from CMSIS */
+#ifndef FUSES_DFLL48M_COARSE_CAL_ADDR
+  #define FUSES_DFLL48M_COARSE_CAL_ADDR (NVMCTRL_OTP5)
+#endif
+#ifndef FUSES_DFLL48M_COARSE_CAL_Pos
+  #define FUSES_DFLL48M_COARSE_CAL_Pos 26
+#endif
+#ifndef FUSES_DFLL48M_COARSE_CAL_Msk
+  #define FUSES_DFLL48M_COARSE_CAL_Msk (0x3Ful << FUSES_DFLL48M_COARSE_CAL_Pos)
+#endif
+
 bool gclk_enabled(uint8_t gclk) {
     return GCLK->GENCTRL[gclk].bit.GENEN;
 }
@@ -88,21 +99,59 @@ static void init_clock_source_xosc32k(void) {
                               OSC32KCTRL_XOSC32K_ENABLE;
 }
 
-static void init_clock_source_dpll48(void)
-{
-    GCLK->PCHCTRL[OSCCTRL_GCLK_ID_DFLL48].reg = GCLK_PCHCTRL_CHEN | GCLK_PCHCTRL_GEN(5);
-    OSCCTRL->DPLLRATIO.reg = OSCCTRL_DPLLRATIO_LDRFRAC(0) | OSCCTRL_DPLLRATIO_LDR(59);
-    OSCCTRL->DPLLCTRLB.reg = OSCCTRL_DPLLCTRLB_REFCLK(0);
-    OSCCTRL->DPLLCTRLA.reg = OSCCTRL_DPLLCTRLA_ENABLE;
+static void init_clock_source_dfll48m_xosc(void) {
+    OSCCTRL->DFLLCTRL.reg = OSCCTRL_DFLLCTRL_ENABLE;
+    while (!OSCCTRL->STATUS.bit.DFLLRDY) {}
+    OSCCTRL->DFLLMUL.reg = OSCCTRL_DFLLMUL_CSTEP(0x1f / 4) |
+                           OSCCTRL_DFLLMUL_FSTEP(0xff / 4) |
+                           OSCCTRL_DFLLMUL_MUL(48000000 / 32768);
+    uint32_t coarse = (*((uint32_t *)FUSES_DFLL48M_COARSE_CAL_ADDR) & FUSES_DFLL48M_COARSE_CAL_Msk) >> FUSES_DFLL48M_COARSE_CAL_Pos;
+    if (coarse == 0x3f) {
+        coarse = 0x1f;
+    }
+    OSCCTRL->DFLLVAL.reg = OSCCTRL_DFLLVAL_COARSE(coarse) |
+                           OSCCTRL_DFLLVAL_FINE(512);
 
-    while (!(OSCCTRL->DPLLSTATUS.bit.LOCK || OSCCTRL->DPLLSTATUS.bit.CLKRDY)) {}
+    OSCCTRL->DFLLCTRL.reg = 0;
+    while ( (OSCCTRL->STATUS.reg & OSCCTRL_STATUS_DFLLRDY) == 0 ) {}
+    OSCCTRL->DFLLCTRL.reg = OSCCTRL_DFLLCTRL_MODE |
+                            OSCCTRL_DFLLCTRL_ENABLE;
+    while ( (OSCCTRL->STATUS.reg & OSCCTRL_STATUS_DFLLRDY) == 0 ) {}
+    while (GCLK->SYNCBUSY.reg & GCLK_SYNCBUSY_MASK) {}
+
+    // Wait for the fine lock on the DFLL.
+    while (!OSCCTRL->STATUS.bit.DFLLLCKC || !OSCCTRL->STATUS.bit.DFLLLCKF) {}
+    //while (!(OSCCTRL->DPLLSTATUS.bit.LOCK || OSCCTRL->DPLLSTATUS.bit.CLKRDY)) {}
+}
+
+static void init_clock_source_dfll48m_usb(uint32_t fine_calibration) {
+    OSCCTRL->DFLLCTRL.reg = OSCCTRL_DFLLCTRL_ENABLE;
+    while ( (OSCCTRL->STATUS.reg & OSCCTRL_STATUS_DFLLRDY) == 0 ) {}
+    OSCCTRL->DFLLMUL.reg = OSCCTRL_DFLLMUL_CSTEP(1) |
+                           OSCCTRL_DFLLMUL_FSTEP(1) |
+                           OSCCTRL_DFLLMUL_MUL(48000);
+    uint32_t coarse = (*((uint32_t *)FUSES_DFLL48M_COARSE_CAL_ADDR) & FUSES_DFLL48M_COARSE_CAL_Msk) >> FUSES_DFLL48M_COARSE_CAL_Pos;
+    if (coarse == 0x3f) {
+        coarse = 0x1f;
+    }
+    OSCCTRL->DFLLVAL.reg = OSCCTRL_DFLLVAL_COARSE(coarse) |
+                           OSCCTRL_DFLLVAL_FINE(fine_calibration);
+    OSCCTRL->DFLLCTRL.reg = OSCCTRL_DFLLCTRL_CCDIS |
+                            OSCCTRL_DFLLCTRL_USBCRM |
+                            OSCCTRL_DFLLCTRL_MODE |
+                            OSCCTRL_DFLLCTRL_ENABLE;
+    while ( (OSCCTRL->STATUS.reg & OSCCTRL_STATUS_DFLLRDY) == 0 ) {}
+    
+    //while (!(OSCCTRL->DPLLSTATUS.bit.LOCK || OSCCTRL->DPLLSTATUS.bit.CLKRDY)) {}
+    //while (GCLK->STATUS.bit.SYNCBUSY) {}
+    while (GCLK->SYNCBUSY.reg & GCLK_SYNCBUSY_MASK) {}
 }
 
 void clock_init(bool has_crystal, uint32_t dfll48m_fine_calibration) {
     // DFLL48M is enabled by default
     // TODO: handle fine calibration data.
 
-    init_clock_source_osculp32k();
+    init_clock_source_osculp32k(); //Dummie for the moment
 
     if (has_crystal) {
         init_clock_source_xosc32k();
@@ -111,13 +160,27 @@ void clock_init(bool has_crystal, uint32_t dfll48m_fine_calibration) {
         OSC32KCTRL->RTCCTRL.bit.RTCSEL = OSC32KCTRL_RTCCTRL_RTCSEL_ULP32K_Val;
     }
 
-    MCLK->CPUDIV.reg = MCLK_CPUDIV_CPUDIV(1);
+    if (has_crystal) {
+        enable_clock_generator(3, GCLK_GENCTRL_SRC_OSC32K_Val, 1);
+        connect_gclk_to_peripheral(3, GCLK_GENCTRL_SRC_DFLL48M_Val);
+        init_clock_source_dfll48m_xosc();
+    } else {
+        init_clock_source_dfll48m_usb(dfll48m_fine_calibration);
+    }
 
-    enable_clock_generator_sync(0, GCLK_GENCTRL_SRC_DFLL48M_Val, 1, false);
-    enable_clock_generator_sync(1, GCLK_GENCTRL_SRC_DFLL48M_Val, 1, false);
-    enable_clock_generator_sync(3, GCLK_GENCTRL_SRC_OSC32K_Val, 1, false);
-
-    init_clock_source_dpll48();
+    enable_clock_generator(0, GCLK_GENCTRL_SRC_DFLL48M_Val, 1);
+    enable_clock_generator(1, GCLK_GENCTRL_SRC_DFLL48M_Val, 1);
+    enable_clock_generator(3, GCLK_GENCTRL_SRC_OSC32K_Val, 1);//??
+    
+    /*if (has_crystal) {
+        enable_clock_generator(2, GCLK_GENCTRL_SRC_XOSC32K_Val, 1);
+    } else {*/
+        enable_clock_generator(2, GCLK_GENCTRL_SRC_OSC32K_Val, 1);
+    //}
+    
+    /* Change OSC48M divider to /1. CPU will run at 48MHz */
+  //OSCCTRL->OSC48MDIV.reg = OSCCTRL_OSC48MDIV_DIV(0);
+  //while ( OSCCTRL->OSC48MSYNCBUSY.reg & OSCCTRL_OSC48MSYNCBUSY_OSC48MDIV );
 
     // Do this after all static clock init so that they aren't used dynamically.
     init_dynamic_clocks();
