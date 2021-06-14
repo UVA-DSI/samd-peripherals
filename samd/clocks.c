@@ -48,6 +48,12 @@ uint8_t find_free_gclk(uint16_t divisor) {
         return 2;
     }
     #endif
+    #ifdef SAML21
+    first_8_bit = 3;
+    if (divisor <= (1 << 5) && !gclk_enabled(2)) {
+        return 2;
+    }
+    #endif
     for (uint8_t i = first_8_bit; i < GCLK_GEN_NUM; i++) {
         if (!gclk_enabled(i)) {
             return i;
