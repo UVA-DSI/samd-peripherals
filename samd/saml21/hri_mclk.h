@@ -1,9 +1,9 @@
 /*
- * This file is part of the MicroPython project, http://micropython.org/
+ * This file is part of the Micro Python project, http://micropython.org/
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2018 Scott Shawcroft for Adafruit Industries
+ * Copyright (c) 2020 Jeff Epler for Adafruit Industries
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,35 +24,13 @@
  * THE SOFTWARE.
  */
 
-#ifndef MICROPY_INCLUDED_ATMEL_SAMD_EVENTS_H
-#define MICROPY_INCLUDED_ATMEL_SAMD_EVENTS_H
+#ifndef MICROPY_INCLUDED_ATMEL_SAMD_HRI_MCLK_H
+#define MICROPY_INCLUDED_ATMEL_SAMD_HRI_MCLK_H
 
-#include <stdbool.h>
-#include <stdint.h>
-
-#include "include/sam.h"
-
-
-#ifdef SAMD21
-#define EVSYS_SYNCH_NUM EVSYS_CHANNELS
+#if defined(SAML21)
+#include "hri/hri_mclk_l21.h"
+#else
+#error Unknown chip family
 #endif
 
-#ifdef SAML21
-#define EVSYS_SYNCH_NUM EVSYS_CHANNELS
 #endif
-
-void turn_on_event_system(void);
-void reset_event_system(void);
-uint8_t find_async_event_channel(void);
-uint8_t find_sync_event_channel(void);
-void disable_event_channel(uint8_t channel_number);
-void disable_event_user(uint8_t user_number);
-void connect_event_user_to_channel(uint8_t user, uint8_t channel);
-void init_async_event_channel(uint8_t channel, uint8_t generator);
-void init_event_channel_interrupt(uint8_t channel, uint8_t gclk, uint8_t generator);
-bool event_interrupt_active(uint8_t channel);
-bool event_interrupt_overflow(uint8_t channel);
-
-bool event_channel_free(uint8_t channel);
-
-#endif  // MICROPY_INCLUDED_ATMEL_SAMD_EVENTS_H

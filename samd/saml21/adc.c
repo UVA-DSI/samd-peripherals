@@ -1,9 +1,9 @@
 /*
- * This file is part of the MicroPython project, http://micropython.org/
+ * This file is part of the Micro Python project, http://micropython.org/
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2018 Scott Shawcroft for Adafruit Industries
+ * Copyright (c) 2017 Dan Halbert for Adafruit Industries
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,35 +24,22 @@
  * THE SOFTWARE.
  */
 
-#ifndef MICROPY_INCLUDED_ATMEL_SAMD_EVENTS_H
-#define MICROPY_INCLUDED_ATMEL_SAMD_EVENTS_H
+#include "hal/include/hal_adc_sync.h"
+#include "hpl/gclk/hpl_gclk_base.h"
+#include "hri_mclk.h"
 
-#include <stdbool.h>
-#include <stdint.h>
+// Do initialization and calibration setup needed for any use of the ADC.
+// The reference and resolution should be set by the caller.
+void samd_peripherals_adc_setup(struct adc_sync_descriptor *adc, Adc *instance) {
+    // Turn the clocks on.
+    hri_mclk_set_APBDMASK_ADC_bit(MCLK);
+    hri_gclk_write_PCHCTRL_reg(GCLK, ADC_GCLK_ID, GCLK_PCHCTRL_GEN_GCLK0_Val | (1 << GCLK_PCHCTRL_CHEN_Pos));
 
-#include "include/sam.h"
+    adc_sync_init(adc, instance, (void *)NULL);
 
-
-#ifdef SAMD21
-#define EVSYS_SYNCH_NUM EVSYS_CHANNELS
-#endif
-
-#ifdef SAML21
-#define EVSYS_SYNCH_NUM EVSYS_CHANNELS
-#endif
-
-void turn_on_event_system(void);
-void reset_event_system(void);
-uint8_t find_async_event_channel(void);
-uint8_t find_sync_event_channel(void);
-void disable_event_channel(uint8_t channel_number);
-void disable_event_user(uint8_t user_number);
-void connect_event_user_to_channel(uint8_t user, uint8_t channel);
-void init_async_event_channel(uint8_t channel, uint8_t generator);
-void init_event_channel_interrupt(uint8_t channel, uint8_t gclk, uint8_t generator);
-bool event_interrupt_active(uint8_t channel);
-bool event_interrupt_overflow(uint8_t channel);
-
-bool event_channel_free(uint8_t channel);
-
-#endif  // MICROPY_INCLUDED_ATMEL_SAMD_EVENTS_H
+    // Load the factory calibration
+    uint8_t biasrefbuf = ((*(uint32_t*) ADC_FUSES_BIASREFBUF_ADDR) & ADC_FUSES_BIASREFBUF_Msk) >> ADC_FUSES_BIASREFBUF_Pos;
+    uint8_t biascomp = ((*(uint32_t*) ADC_FUSES_BIASCOMP_ADDR) & ADC_FUSES_BIASCOMP_Msk) >> ADC_FUSES_BIASCOMP_Pos;
+    hri_adc_write_CALIB_BIASREFBUF_bf(instance, biasrefbuf);
+    hri_adc_write_CALIB_BIASCOMP_bf(instance, biascomp);
+}

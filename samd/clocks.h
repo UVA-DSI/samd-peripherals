@@ -35,7 +35,7 @@
 #ifdef SAM_D5X_E5X
 #define CLOCK_48MHZ GCLK_GENCTRL_SRC_DFLL_Val
 #endif
-#ifdef SAMD21
+#if defined(SAMD21) || defined(SAML21)
 #define CLOCK_48MHZ GCLK_GENCTRL_SRC_DFLL48M_Val
 #endif
 

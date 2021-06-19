@@ -101,6 +101,9 @@ void tc_reset(Tc* tc) {
 #ifdef SAMD21
 #define TC_OFFSET 3
 #endif
+#ifdef SAML21
+#define TC_OFFSET 3
+#endif
 
 void TCC0_Handler(void) {
     shared_timer_handler(false, 0);

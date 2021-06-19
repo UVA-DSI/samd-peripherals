@@ -36,6 +36,11 @@ extern const uint8_t tcc_cc_num[3];
 extern const uint8_t tc_gclk_ids[TC_INST_NUM];
 extern const uint8_t tcc_gclk_ids[3];
 #endif
+#ifdef SAML21
+extern const uint8_t tcc_cc_num[3];
+extern const uint8_t tc_gclk_ids[TC_INST_NUM];
+extern const uint8_t tcc_gclk_ids[3];
+#endif
 #ifdef SAM_D5X_E5X
 extern const uint8_t tcc_cc_num[5];
 extern const uint8_t tc_gclk_ids[TC_INST_NUM];

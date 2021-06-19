@@ -24,35 +24,46 @@
  * THE SOFTWARE.
  */
 
-#ifndef MICROPY_INCLUDED_ATMEL_SAMD_EVENTS_H
-#define MICROPY_INCLUDED_ATMEL_SAMD_EVENTS_H
+#include "samd/events.h"
 
-#include <stdbool.h>
-#include <stdint.h>
+#include "samd/clocks.h"
 
-#include "include/sam.h"
+#include "py/runtime.h"
 
+#include "hpl/pm/hpl_pm_base.h"
 
-#ifdef SAMD21
-#define EVSYS_SYNCH_NUM EVSYS_CHANNELS
-#endif
+void turn_on_event_system(void) {
+    hri_mclk_set_APBDMASK_EVSYS_bit(MCLK);
+}
 
-#ifdef SAML21
-#define EVSYS_SYNCH_NUM EVSYS_CHANNELS
-#endif
+void reset_event_system(void) {
+    EVSYS->CTRLA.bit.SWRST = true;
+    hri_mclk_clear_APBDMASK_EVSYS_bit(MCLK);
+}
 
-void turn_on_event_system(void);
-void reset_event_system(void);
-uint8_t find_async_event_channel(void);
-uint8_t find_sync_event_channel(void);
-void disable_event_channel(uint8_t channel_number);
-void disable_event_user(uint8_t user_number);
-void connect_event_user_to_channel(uint8_t user, uint8_t channel);
-void init_async_event_channel(uint8_t channel, uint8_t generator);
-void init_event_channel_interrupt(uint8_t channel, uint8_t gclk, uint8_t generator);
-bool event_interrupt_active(uint8_t channel);
-bool event_interrupt_overflow(uint8_t channel);
+bool event_channel_free(uint8_t channel) {
+    return 0;
+}
 
-bool event_channel_free(uint8_t channel);
+void disable_event_channel(uint8_t channel_number) {
+}
 
-#endif  // MICROPY_INCLUDED_ATMEL_SAMD_EVENTS_H
+void disable_event_user(uint8_t user_number) {
+}
+
+void connect_event_user_to_channel(uint8_t user, uint8_t channel) {
+}
+
+void init_async_event_channel(uint8_t channel, uint8_t generator) {
+}
+
+void init_event_channel_interrupt(uint8_t channel, uint8_t gclk, uint8_t generator) {
+}
+
+bool event_interrupt_active(uint8_t channel) {
+    return 0;
+}
+
+bool event_interrupt_overflow(uint8_t channel) {
+    return 0;
+}
