@@ -28,6 +28,7 @@
 #include "samd/clocks.h"
 #include "hpl_gclk_config.h"
 
+
 /* Defines missing from CMSIS */
 #ifndef FUSES_DFLL48M_COARSE_CAL_ADDR
   #define FUSES_DFLL48M_COARSE_CAL_ADDR (NVMCTRL_OTP5)
@@ -39,6 +40,7 @@
   #define FUSES_DFLL48M_COARSE_CAL_Msk (0x3Ful << FUSES_DFLL48M_COARSE_CAL_Pos)
 #endif
 
+/*
 bool gclk_enabled(uint8_t gclk) {
     return GCLK->GENCTRL[gclk].bit.GENEN;
 }
@@ -48,6 +50,7 @@ void disable_gclk(uint8_t gclk) {
     GCLK->GENCTRL[gclk].bit.GENEN = false;
     while ((GCLK->SYNCBUSY.vec.GENCTRL & (1 << gclk)) != 0) {}
 }
+
 
 void connect_gclk_to_peripheral(uint8_t gclk, uint8_t peripheral) {
     GCLK->PCHCTRL[peripheral].reg = GCLK_PCHCTRL_CHEN | GCLK_PCHCTRL_GEN(gclk);
@@ -73,7 +76,8 @@ static void enable_clock_generator_sync(uint8_t gclk, uint32_t source, uint16_t 
 
     GCLK->GENCTRL[gclk].reg = GCLK_GENCTRL_SRC(source) | GCLK_GENCTRL_DIV(divisor) | divsel | GCLK_GENCTRL_OE | GCLK_GENCTRL_GENEN;
     if (sync)
-        while ((GCLK->SYNCBUSY.vec.GENCTRL & (1 << gclk)) != 0) {}
+        while ( GCLK->SYNCBUSY.reg & GCLK_SYNCBUSY_MASK );
+        //while ((GCLK->SYNCBUSY.vec.GENCTRL & (1 << gclk)) != 0) {}
 }
 
 void enable_clock_generator(uint8_t gclk, uint32_t source, uint16_t divisor) {
@@ -146,46 +150,63 @@ static void init_clock_source_dfll48m_usb(uint32_t fine_calibration) {
     //while (GCLK->STATUS.bit.SYNCBUSY) {}
     while (GCLK->SYNCBUSY.reg & GCLK_SYNCBUSY_MASK) {}
 }
-
+*/
 void clock_init(bool has_crystal, uint32_t dfll48m_fine_calibration) {
+    // Update SystemCoreClock since it is hard coded with asf4 and not correct
+    // Init 1ms tick timer (samd SystemCoreClock may not correct)
+    
+    _osc32kctrl_init_sources();
+    _oscctrl_init_sources();
+    _mclk_init();
+    _oscctrl_init_referenced_generators();
+    _gclk_init_generators_by_fref(0x0000001F);
+    /* USB Clock init
+    * The USB module requires a GCLK_USB of 48 MHz ~ 0.25% clock
+    * for low speed and full speed operation. */
+    hri_gclk_write_PCHCTRL_reg(GCLK, USB_GCLK_ID, GCLK_PCHCTRL_GEN_GCLK1_Val | GCLK_PCHCTRL_CHEN);
+    hri_mclk_set_AHBMASK_USB_bit(MCLK);
+    hri_mclk_set_APBBMASK_USB_bit(MCLK);
+
     // DFLL48M is enabled by default
     // TODO: handle fine calibration data.
+    //enable_clock_generator(0, GCLK_GENCTRL_SRC_DFLL48M_Val, 0);
+    /*
+        init_clock_source_osculp32k(); //Dummie for the moment
 
-    init_clock_source_osculp32k(); //Dummie for the moment
+        if (has_crystal) {
+            init_clock_source_xosc32k();
+            OSC32KCTRL->RTCCTRL.bit.RTCSEL = OSC32KCTRL_RTCCTRL_RTCSEL_XOSC32K_Val;
+        } else {
+            OSC32KCTRL->RTCCTRL.bit.RTCSEL = OSC32KCTRL_RTCCTRL_RTCSEL_ULP32K_Val;
+        }
 
-    if (has_crystal) {
-        init_clock_source_xosc32k();
-        OSC32KCTRL->RTCCTRL.bit.RTCSEL = OSC32KCTRL_RTCCTRL_RTCSEL_XOSC32K_Val;
-    } else {
-        OSC32KCTRL->RTCCTRL.bit.RTCSEL = OSC32KCTRL_RTCCTRL_RTCSEL_ULP32K_Val;
-    }
+        if (has_crystal) {
+            connect_gclk_to_peripheral(3, GCLK_GENCTRL_SRC_DFLL48M_Val);
+            init_clock_source_dfll48m_xosc();
+        } else {
+            init_clock_source_dfll48m_usb(dfll48m_fine_calibration);
+        }
 
-    if (has_crystal) {
-        enable_clock_generator(3, GCLK_GENCTRL_SRC_OSC32K_Val, 1);
-        connect_gclk_to_peripheral(3, GCLK_GENCTRL_SRC_DFLL48M_Val);
-        init_clock_source_dfll48m_xosc();
-    } else {
-        init_clock_source_dfll48m_usb(dfll48m_fine_calibration);
-    }
+        enable_clock_generator(0, GCLK_GENCTRL_SRC_OSC16M_Val, 1);
+        enable_clock_generator(1, GCLK_GENCTRL_SRC_DFLL48M_Val, 1);//??
+        enable_clock_generator(3, GCLK_GENCTRL_SRC_OSCULP32K_Val, 1);
+    */
 
-    enable_clock_generator(0, GCLK_GENCTRL_SRC_DFLL48M_Val, 1);
-    enable_clock_generator(1, GCLK_GENCTRL_SRC_DFLL48M_Val, 1);
-    enable_clock_generator(3, GCLK_GENCTRL_SRC_OSC32K_Val, 1);//??
-    
     /*if (has_crystal) {
         enable_clock_generator(2, GCLK_GENCTRL_SRC_XOSC32K_Val, 1);
     } else {*/
-        enable_clock_generator(2, GCLK_GENCTRL_SRC_OSC32K_Val, 1);
+      //enable_clock_generator(2, GCLK_GENCTRL_SRC_OSC32K_Val, 1);
     //}
     
     /* Change OSC48M divider to /1. CPU will run at 48MHz */
-  //OSCCTRL->OSC48MDIV.reg = OSCCTRL_OSC48MDIV_DIV(0);
-  //while ( OSCCTRL->OSC48MSYNCBUSY.reg & OSCCTRL_OSC48MSYNCBUSY_OSC48MDIV );
+    //OSCCTRL->OSC48MDIV.reg = OSCCTRL_OSC48MDIV_DIV(0);
+    //while ( OSCCTRL->OSC48MSYNCBUSY.reg & OSCCTRL_OSC48MSYNCBUSY_OSC48MDIV );
 
     // Do this after all static clock init so that they aren't used dynamically.
-    init_dynamic_clocks();
+    //init_dynamic_clocks();
 }
 
+/*
 static bool clk_enabled(uint8_t clk) {
     return GCLK->PCHCTRL[clk].bit.CHEN;
 }
@@ -388,3 +409,4 @@ int clock_set_calibration(uint8_t type, uint8_t index, uint32_t val) {
     }
     return -2;
 }
+*/

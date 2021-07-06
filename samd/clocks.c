@@ -70,6 +70,6 @@ void init_dynamic_clocks(void) {
 
 void reset_gclks(void) {
     for (uint8_t i = last_static_clock + 1; i < GCLK_GEN_NUM; i++) {
-        disable_gclk(i);
+        //disable_gclk(i);
     }
 }
