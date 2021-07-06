@@ -31,6 +31,13 @@
 #include <stdint.h>
 
 #include "include/sam.h"
+#include "atmel_start_pins.h"
+#include "peripheral_clk_config.h"
+#include "hal/include/hal_delay.h"
+#include "hal/include/hal_flash.h"
+#include "hal/include/hal_gpio.h"
+#include "hal/include/hal_init.h"
+#include "hpl/gclk/hpl_gclk_base.h"
 
 #ifdef SAM_D5X_E5X
 #define CLOCK_48MHZ GCLK_GENCTRL_SRC_DFLL_Val
